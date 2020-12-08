@@ -1,0 +1,3 @@
+* Indico to Org
+** Installation
+   =python setup.py install=
