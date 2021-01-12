@@ -208,13 +208,13 @@ class OrgNode():
         """
 
         args = {
-            'heading' : node.heading,
+            'heading' : node.get_heading('raw'),
             'todo' : node.todo,
             'tags' : node.tags,
             'scheduled' : node.scheduled.start,
             'timestamps' : [(ts.start, ts.end) for ts in node.datelist], 
             'properties' : node.properties,
-            'body' : node.body,
+            'body' : node.get_body('raw'),
             'children' : [class_object.from_orgparse(child) for child in node.children]
         }
 
@@ -299,8 +299,11 @@ def _sanitize_url(x: str) -> str:
     }))
 
 
-def _sanitize_heading(x: str) -> str:
+def _sanitize_heading(x: str, tags: []) -> str:
     # TODO do something smarter? e.g. https://stackoverflow.com/questions/12737564/escaping-characters-in-emacs-org-mode
+    for tag in tags:
+        x = x.replace(tag, '')
+    x.rstrip(':')
     return re.sub(r'[\]\[]', '', x.strip())
 
 

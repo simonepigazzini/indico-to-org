@@ -45,7 +45,7 @@ def load_org_file(orgfile):
     
     my_events = {}
 
-    if os.path.exists(orgfile):
+    if orgfile and os.path.exists(orgfile):
         org_agenda = orgparse.load(orgfile)
         for cat in org_agenda.children:
             my_events[cat.get_property('INDICO-ID', cat.heading)] = { 'node' : cat, 'children' : {} }

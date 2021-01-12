@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
         ### Get the existing agenda and create a map of ID -> node
         my_events = load_org_file(options.orgfile)
-            
+
         indico_events = {}
         for cat in options.config['categories']:
             for k in ['person_id', 'api_key', 'secret_key']:
@@ -49,6 +49,11 @@ if __name__ == '__main__':
                 'order'  : 'start',
                 'pretty' : 'yes'
             }
+
+            ### initialize heading
+            if cat['id'] in my_events:
+                cat['heading'] = my_events[cat['id']]['node'].get_heading('raw')
+
             indico_events[cat['id']] = IndicoCategory(**cat)
             indico_events[cat['id']](my_events[cat['id']]['children'] if cat['id'] in my_events.keys() else {})
 

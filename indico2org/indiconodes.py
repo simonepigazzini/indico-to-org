@@ -40,7 +40,7 @@ class IndicoEvent(inorganic.OrgNode):
         for contrib in contributions_data:
             indico_contributions.insert(0, { 'heading' : contrib['title'],
                                              'body' : contrib['description'],
-                                             'todo' : 'TODO' if any([s['person_id']==self.person_id for s in contrib['speakers']]) and is_current else None,
+                                             'todo' : 'TODO' if any([s['db_id']==self.person_id for s in contrib['speakers']]) and is_current else None,
                                              'properties' : { 'INDICO-ID' : contrib['id'],
                                                               'SPEAKER' : ', '.join([s['fullName'].replace(',', '') for s in contrib['speakers']])}
                                             } )
@@ -62,7 +62,7 @@ class IndicoEvent(inorganic.OrgNode):
                 
         ### Check if the event is already in the agenda and copy the relevant parts
         if orig_event:
-            self.body = orig_event.body
+            self.body = orig_event.get_body('raw')
             self.todo = orig_event.todo
             self.tags.update(orig_event.tags)
             self.properties.update(orig_event.properties)
@@ -73,7 +73,7 @@ class IndicoEvent(inorganic.OrgNode):
                 else:
                     for from_indico in indico_contributions:
                         if contrib.properties['INDICO-ID'] == from_indico['properties']['INDICO-ID']:
-                            from_indico['body'] = contrib.body if contrib.body != '' else from_indico['body']
+                            from_indico['body'] = contrib.get_body('raw') if contrib.body != '' else from_indico['body']
                             from_indico['todo'] = contrib.todo if contrib.todo else from_indico['todo']
                             from_indico['tags'] = contrib.tags
                             from_indico['timestamps'] = [(ts.start, ts.end) for ts in contrib.datelist]
@@ -124,16 +124,19 @@ class IndicoCategory(IndicoEvent):
             
         api_call = 'https://indico.cern.ch'+build_indico_request('/export/categ/%s.json'%self.id, self.query_params, self.api_key, self.secret_key)
         print(api_call)
-        
+
         resp = requests.get(api_call)
 
-        cat_info = resp.json()['additionalInfo']['eventCategories'][-1]['path'][-2]
-        assert(str(cat_info['id']) == self.id)
-    
+        cat_info = None
+        if len(resp.json()['results']):
+            cat_info = resp.json()['additionalInfo']['eventCategories'][-1]['path'][-2]
+            assert(str(cat_info['id']) == self.id)
+        
         updated_events = OrderedDict()
 
         ### create event nodes 
         for event in resp.json()['results']:
+
             if not self.events_filter or self.events_filter in event['title']:
                 args = asdict(self)
                 args.pop('events_filter')
@@ -145,13 +148,17 @@ class IndicoCategory(IndicoEvent):
 
                 ### remove previous org node related to this event
                 orig_nodes.pop(event['id'], None)
-            
+                
         ### cleanup local events (from indico) and preserve local nodes
         for id, event in orig_nodes.items():
-            if not event.get_property('INDICO-ID', None):
+            ### To be improved            
+            fetch_range = (datetime.fromordinal(datetime.today().toordinal()-int(self.query_params['from'][1:-1])),
+                           datetime.fromordinal(datetime.today().toordinal()+int(self.query_params['to'][1:-1])))
+            event_start = event.rangelist[-1].start if len(event.rangelist) else None
+            if not event.get_property('INDICO-ID', None) or not event_start or event_start<fetch_range[0] or event_start>fetch_range[1]:
                 self.children.append(inorganic.OrgNode.from_orgparse(event))
 
         ### fill in category node properties
-        self.heading = cat_info['name']
-        self.properties = { 'INDICO-ID' : cat_info['id'] }
+        self.heading = cat_info['name'] if cat_info else self.heading
+        self.properties = { 'INDICO-ID' : cat_info['id'] } if cat_info else self.properties
         
